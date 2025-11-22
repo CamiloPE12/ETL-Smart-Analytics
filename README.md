@@ -43,3 +43,119 @@ Para ejecutar este notebook, se requiere:
 1. Descarga el archivo de datos `Data.xlsx` y ubícalo en la ruta correspondiente.
 2. Abre y ejecuta el notebook `ETL.ipynb` en **Jupyter Notebook** o **Visual**.
 3. Analiza los resultados y ajusta los parámetros según sea necesario.
+4. 
+
+# Arquitectura General del Sistema
+
+┌───────────────────────────────────────────────────┐
+│                 Usuario WhatsApp                  │
+└───────────────▲───────────────────────────────────┘
+                │ Mensaje Entrante
+                │
+┌───────────────┴──────────────┐
+│       WhatsApp Cloud API      │
+│   (Meta Business / Webhooks)  │
+└───────────────▲──────────────┘
+                │ Webhook (POST)
+                │
+┌───────────────┴──────────────┐
+│          N8N Workflow         │
+│──────────────────────────────│
+│ 1. WhatsApp Trigger           │
+│ 2. AI Agent + Memory          │
+│ 3. Vector Store Retrieve      │
+│ 4. Vector Store Insert        │
+│ 5. Scraping Programado        │
+│ 6. Send WhatsApp Message Back │
+└───────────────▲──────────────┘
+                │ Respuesta IA
+                │
+┌───────────────┴──────────────┐
+│            Usuario            │
+└──────────────────────────────┘
+
+# Flujo Conversacional
+
+Usuario → WhatsApp → Webhook → N8N → Agente IA → RAG / Memoria → Respuesta → WhatsApp → Usuario
+
+
+1. Usuario envía un mensaje por WhatsApp
+2. WhatsApp Cloud API envía ese mensaje al webhook configurado en N8N
+3. N8N activa el nodo "WhatsApp Trigger"
+4. El mensaje se pasa al nodo "AI Agent + Memory"
+5. El agente:
+   a. Analiza intención y contexto
+   b. Usa Function Calling para decidir herramienta
+   c. Si es necesario: consulta Vector Store (RAG)
+6. Si no existe información: consulta scraping automatizado o responde por defecto
+7. Se genera la respuesta final en lenguaje natural
+8. N8N usa el nodo "Send Message" para devolver al usuario
+
+# Arquitectura RAG (Retrieval-Augmented Generation)
+
+        ┌────────────────────────────┐
+        │  Fuente Web / Documentos   │
+        └───────────────▲────────────┘
+                        │ Scraping / Carga
+                        │
+        ┌───────────────┴────────────┐
+        │  Extracción & Limpieza JS   │
+        └───────────────▲────────────┘
+                        │
+        ┌───────────────┴─────────────┐
+        │ Text Splitter (chunking)     │
+        └───────────────▲──────────────┘
+                        │
+┌───────────────────────┴────────────────────────┐
+│    Embeddings OpenAI / LLM Embeddings Model    │
+└───────────────────────▲────────────────────────┘
+                        │
+        ┌───────────────┴────────────┐
+        │       Vector Store          │
+        │ (Insert / Retrieve / Upsert)│
+        └───────────────▲────────────┘
+                        │
+        ┌───────────────┴────────────┐
+        │   AI Agent (Function Call)  │
+        └───────────────▲────────────┘
+                        │ Respuestas basadas en evidencia
+                        │
+                ┌───────┴───────┐
+                │  WhatsApp Bot  │
+                └───────────────┘
+# Memoria Conversacional
+
+Claves de sesión:
+sessionId = número de WhatsApp del usuario
+
+Memoria almacena:
+- Últimas interacciones
+- Intención del usuario
+- Dependencias de preguntas anteriores
+
+Ejemplo:
++57315XXXXXX :
+   • “Hola”
+   • “quiero información”
+   • “sobre horarios”
+
+→ Respuesta se construye con historial
+
+
+# Workflow en N8N
+
+[WhatsApp Trigger]
+        │
+        ▼
+[AI Agent + Memory]
+        │
+        ├── Consulta RAG → [Vector Store Retrieve]
+        │
+        ├── Actualización conocimiento → [Scraping] → [Split] → [Embeddings] → [Vector Store Insert]
+        │
+        ▼
+[Send WhatsApp Message]
+
+# Arquitectura Final Resumida
+WhatsApp → Meta API → N8N → Agente IA → RAG / Memoria → Respuesta → WhatsApp
+
